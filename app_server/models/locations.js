@@ -1,61 +1,45 @@
-const mongoose = require('mongoose');
-const readLine = require('readline');
 
-let dbURL = 'mongodb://127.0.0.1/Loc8r';
-if (process.env.NODE_ENV === 'production') {
-  dbURL = process.env.DB_HOST || process.env.MONGODB_URI;
-}
-
-const connect = () => {
-  setTimeout(() => mongoose.connect(dbURL, { useNewUrlParser: true, useCreateIndex: true, useUnifiedTopology: true }), 1000);
-}
-
-mongoose.connection.on('connected', () => {
-  console.log('connected');
+const mongoose = require( 'mongoose' );
+const openingTimeSchema = new mongoose.Schema({
+  days: {type: String, required: true},
+  opening: String,
+  closing: String,
+  closed: {
+    type: Boolean,
+    required: true
+  }
 });
-
-mongoose.connection.on('error', err => {
-  console.log('error: ' + err);
-  return connect();
+const reviewSchema = new mongoose.Schema({
+  author: String,
+  rating: {
+    type: Number,
+    required: true,
+    min: 0,
+    max: 5
+  },
+  reviewText: String,
+  createdOn: {type: Date, default: Date.now}
 });
-
-mongoose.connection.on('disconnected', () => {
-  console.log('disconnected');
+const locationSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true
+  },
+  address: String,
+  rating: {
+    type: Number,
+    'default': 0,
+    min: 0,
+    max: 5
+  },
+  facilities: [String],
+  coords: {
+    type: {type: String },
+    coordinates:[Number]
+  },
+  openingTimes: [openingTimeSchema],
+  reviews: [reviewSchema]
 });
+locationSchema.index({coords: '2dsphere'});
 
-if (process.platform === 'win32') {
-  const rl = readLine.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-  rl.on ('SIGINT', () => {
-    process.emit("SIGINT");
-  });
-}
-
-const gracefulShutdown = (msg, callback) => {
-  mongoose.connection.close( () => {
-    console.log(`Mongoose disconnected through ${msg}`);
-    callback();
-  });
-};
-
-process.once('SIGUSR2', () => {
-  gracefulShutdown('nodemon restart', () => {
-    process.kill(process.pid, 'SIGUSR2');
-  });
-});
-process.on('SIGINT', () => {
-  gracefulShutdown('app termination', () => {
-    process.exit(0);
-  });
-});
-process.on('SIGTERM', () => {
-  gracefulShutdown('Heroku app shutdown', () => {
-    process.exit(0);
-  });
-});
-
-connect();
-
-require('./locations');
+mongoose.model('Location', locationSchema);
